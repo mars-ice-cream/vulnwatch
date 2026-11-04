@@ -81,6 +81,8 @@ final class NvdConnector implements SourceConnectorInterface
                 ['nvd_status' => 'pending'],
                 ['nvd_status' => 'error', 'nvd_fetched_at' => ['<', date('Y-m-d H:i:s', time() - 3600)]],
                 ['nvd_status' => 'ok', 'nvd_fetched_at' => ['<', date('Y-m-d H:i:s', time() - 7 * 86400)]],
+                // CVE citée avant sa publication NVD : on réessaie chaque jour
+                ['nvd_status' => 'not_found', 'nvd_fetched_at' => ['<', date('Y-m-d H:i:s', time() - 86400)]],
             ]],
             'ORDER'  => ['nvd_status DESC', 'nvd_fetched_at ASC'],
             'LIMIT'  => $limit,
@@ -120,10 +122,14 @@ final class NvdConnector implements SourceConnectorInterface
         $client = $this->client ?? new SafeHttpClient();
         $last = Config::get('nvd_last_sync');
         $start = $last !== '' ? strtotime($last) : time() - 7 * 86400;
-        $end = min(time(), $start + 119 * 86400); // fenêtre max NVD : 120 jours
+        // Reprise d'une fenêtre interrompue (budget atteint) : même fenêtre, page suivante
+        $cursorEnd = Config::get('nvd_incr_window_end');
+        $end = $cursorEnd !== '' ? (int) $cursorEnd : min(time(), $start + 119 * 86400); // fenêtre max NVD : 120 jours
+        $index = $cursorEnd !== '' ? (int) Config::get('nvd_incr_index') : 0;
         $fmt = static fn(int $t) => gmdate('Y-m-d\TH:i:s.000', $t);
-        $index = 0;
         $done = 0;
+        $pages = 0;
+        $total = 0;
         try {
             do {
                 $url = self::apiUrl() . '?' . http_build_query([
@@ -139,17 +145,30 @@ final class NvdConnector implements SourceConnectorInterface
                     self::importVulnerability($v['cve'], 'nvd_sync');
                     $done++;
                 }
+                $pages++;
                 $index += (int) ($data['resultsPerPage'] ?? 0);
                 $total = (int) ($data['totalResults'] ?? 0);
-                if ($index < $total && !defined('VULNWATCH_TESTING')) {
+                if ((int) ($data['resultsPerPage'] ?? 0) === 0) {
+                    break; // page vide : fin de fenêtre
+                }
+                if ($index < $total && $pages < $budget && !defined('VULNWATCH_TESTING')) {
                     usleep(6200000);
                 }
-            } while ($index < $total && $done < $budget * 2000);
-            Config::set(['nvd_last_sync' => date('Y-m-d H:i:s', $end)]);
+            } while ($index < $total && $pages < $budget);
+
+            if ($index < $total) {
+                // Budget atteint : on mémorise la fenêtre et la page, la date de reprise n'avance pas
+                Config::set(['nvd_incr_window_end' => (string) $end, 'nvd_incr_index' => (string) $index]);
+                return ['ok' => true, 'done' => $done, 'errors' => 0, 'message' => sprintf('%d CVE synchronisées, reprise à %d/%d', $done, $index, $total)];
+            }
+            Config::set(['nvd_last_sync' => date('Y-m-d H:i:s', $end), 'nvd_incr_window_end' => '', 'nvd_incr_index' => '0']);
             return ['ok' => true, 'done' => $done, 'errors' => 0, 'message' => "$done CVE synchronisées"];
         } catch (\Throwable $e) {
             Logger::log('NVD incrémental : ' . $e->getMessage());
-            // La date de reprise n'avance pas : la fenêtre sera rejouée
+            // Ni la date ni la page de reprise n'avancent : la page en erreur sera rejouée
+            if ($cursorEnd !== '' || $index > 0) {
+                Config::set(['nvd_incr_window_end' => (string) $end, 'nvd_incr_index' => (string) $index]);
+            }
             return ['ok' => false, 'done' => $done, 'errors' => 1, 'message' => $e->getMessage()];
         }
     }

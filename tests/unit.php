@@ -102,6 +102,9 @@ check('plateforme cible vérifiée → établie', $r['status'] === 'established'
 $r = Evaluator::evaluate(['target_sw' => 'windows'] + $crit, '130.0', $auto, ['os_families' => ['unknown']]);
 check('plateforme inconnue → à vérifier', $r['status'] === 'to_check');
 
+$r = Evaluator::evaluate(['target_hw' => 'x86'] + $crit, '130.0', ['status' => 'validated', 'confidence' => 100], ['arch' => 'arm64']);
+check('matériel cible non vérifiable → à vérifier', $r['status'] === 'to_check', json_encode($r));
+
 echo "NVD : critères et conditions\n";
 $nvd = json_decode(file_get_contents(__DIR__ . '/fixtures/nvd/CVE-2024-4577.json'), true)['vulnerabilities'][0]['cve'];
 $cr = NvdConnector::extractCriteria($nvd['configurations']);

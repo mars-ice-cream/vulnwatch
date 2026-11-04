@@ -18,6 +18,9 @@ final class Config
         'nvd_mode'             => 'referenced',
         'nvd_batch_size'       => '20',
         'nvd_last_sync'        => '',
+        // Curseur de reprise du mode incrémental (fenêtre en cours, page suivante)
+        'nvd_incr_window_end'  => '',
+        'nvd_incr_index'       => '0',
         'kev_enabled'          => '1',
         'kev_track_all'        => '0',
         'kev_url'              => 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json',

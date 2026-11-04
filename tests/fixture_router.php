@@ -5,6 +5,14 @@ $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $mode = @file_get_contents('/tmp/vulnwatch_fixture_mode') ?: 'normal';
 header('Cache-Control: no-store');
 switch (true) {
+    case $path === '/nvd' && isset($_GET['lastModStartDate']):
+        // Mode incrémental : 3 CVE, une par page, pour tester la reprise
+        $ids = ['CVE-2024-9680', 'CVE-2024-11477', 'CVE-2023-4863'];
+        $i = (int) ($_GET['startIndex'] ?? 0);
+        header('Content-Type: application/json');
+        $vulns = isset($ids[$i]) ? json_decode(file_get_contents("$base/nvd/{$ids[$i]}.json"), true)['vulnerabilities'] : [];
+        echo json_encode(['resultsPerPage' => count($vulns), 'startIndex' => $i, 'totalResults' => count($ids), 'vulnerabilities' => $vulns]);
+        break;
     case $path === '/nvd':
         $id = preg_replace('/[^A-Z0-9-]/', '', strtoupper($_GET['cveId'] ?? ''));
         header('Content-Type: application/json');

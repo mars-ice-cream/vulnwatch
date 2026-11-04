@@ -122,6 +122,14 @@ final class Evaluator
             }
         }
 
+        // Matériel cible (target_hw) : l'inventaire logiciel ne permet pas de le vérifier de façon fiable
+        $hw = strtolower((string) ($criterion['target_hw'] ?? '*'));
+        if ($hw !== '*' && $hw !== '-' && $hw !== '') {
+            $reasons[] = 'Condition non vérifiable : matériel/architecture cible « ' . $hw . ' »' . (!empty($context['arch']) ? ' (architecture inventoriée : ' . $context['arch'] . ')' : '');
+            $confidence -= 20;
+            $unverifiable = true;
+        }
+
         if (!empty($criterion['conditions'])) {
             $reasons[] = 'Conditions de configuration non vérifiables depuis l\'inventaire : ' . str_replace("\n", ' ; ', (string) $criterion['conditions']);
             $confidence -= 30;

@@ -378,6 +378,35 @@ $php = itemsFor('VW-PC-A1', 'CVE-2024-4577');
 $fixedPhp = array_filter($php, static fn($x) => $x['state'] === 'fixed');
 check('corrige', 'logiciel recréé par GLPI avec la même version : jamais « Corrigé », suivi repris', $fixedPhp === [] && activeItem('VW-PC-A1', 'CVE-2024-4577') !== null, $php);
 
+// Plusieurs associations pour un même logiciel : la plus défavorable n'écrase pas les autres
+$DB->insert('glpi_plugin_vulnwatch_mappings', ['name_norm' => 'mozilla firefox', 'manufacturer_norm' => 'mozilla', 'sample_name' => 'test', 'vendor' => 'mozilla',
+    'product' => 'thunderbird', 'status' => 'validated', 'confidence' => 100, 'reason' => 'test multi-associations']);
+analyze();
+$i = activeItem('VW-PC-A1', 'CVE-2024-9680');
+check('multi_associations', 'Firefox 130.0 reste établi malgré une 2e association (thunderbird, hors plage)', ($i['fstatus'] ?? '') === 'established', $i);
+
+// ---------------------------------------------------------------------------
+section('NVD : reprises');
+$DB->update('glpi_plugin_vulnwatch_cves', ['nvd_status' => 'not_found', 'nvd_fetched_at' => date('Y-m-d H:i:s', time() - 2 * 86400)], ['cve_id' => 'CVE-2024-11477']);
+$DB->update('glpi_plugin_vulnwatch_cves', ['nvd_status' => 'ok', 'nvd_fetched_at' => date('Y-m-d H:i:s')], ['NOT' => ['cve_id' => 'CVE-2024-11477']]);
+(new \GlpiPlugin\Vulnwatch\Source\NvdConnector())->run(20);
+$st = $DB->request(['SELECT' => 'nvd_status', 'FROM' => 'glpi_plugin_vulnwatch_cves', 'WHERE' => ['cve_id' => 'CVE-2024-11477']])->current()['nvd_status'];
+check('nvd_reprise', 'CVE « not_found » ancienne de plus d\'un jour : réessayée et récupérée', $st === 'ok', $st);
+
+$since = date('Y-m-d H:i:s', time() - 3600);
+Config::set(['nvd_mode' => 'incremental', 'nvd_last_sync' => $since, 'nvd_incr_window_end' => '', 'nvd_incr_index' => '0']);
+$nvd = new \GlpiPlugin\Vulnwatch\Source\NvdConnector();
+$r1 = $nvd->run(1);
+Config::reset();
+check('nvd_reprise', 'budget atteint : curseur mémorisé, date de reprise inchangée', $r1['done'] === 1 && Config::get('nvd_incr_index') === '1' && Config::get('nvd_last_sync') === $since, [$r1, Config::get('nvd_incr_index'), Config::get('nvd_last_sync')]);
+$r2 = $nvd->run(1);
+Config::reset();
+check('nvd_reprise', 'passe suivante : reprise à la page 2, pas de CVE sautée', $r2['done'] === 1 && Config::get('nvd_incr_index') === '2', [$r2, Config::get('nvd_incr_index')]);
+$r3 = $nvd->run(5);
+Config::reset();
+check('nvd_reprise', 'fin de fenêtre : date avancée, curseur effacé', $r3['done'] === 1 && Config::get('nvd_incr_window_end') === '' && Config::get('nvd_last_sync') !== $since, [$r3, Config::get('nvd_last_sync')]);
+Config::set(['nvd_mode' => 'referenced', 'nvd_incr_window_end' => '', 'nvd_incr_index' => '0']);
+
 // ---------------------------------------------------------------------------
 echo "\n$pass réussis, $fail échecs\n";
 file_put_contents(__DIR__ . '/integration-results.json', json_encode(['date' => date('c'), 'glpi' => GLPI_VERSION, 'pass' => $pass, 'fail' => $fail, 'results' => $results], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));

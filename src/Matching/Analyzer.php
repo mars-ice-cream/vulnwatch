@@ -77,35 +77,35 @@ final class Analyzer
         foreach ($groups as $key => $group) {
             [$nameNorm, $manufNorm] = explode('|', $key, 2);
             $mappings = $this->syncMappings($nameNorm, $manufNorm, $group['sample'], $productsByToken, $knownProducts);
+            // Résultats de TOUTES les associations du groupe, combinés par (CVE, version) avant l'écriture :
+            // une association ne doit pas écraser le résultat d'une autre.
+            $pending = [];
             foreach ($mappings as $m) {
                 if ($m['status'] === 'rejected') {
                     continue;
                 }
                 $vp = $m['vendor'] . ':' . $m['product'];
                 $criteriaCache[$vp] ??= iterator_to_array($DB->request(['FROM' => self::T_CRITERIA, 'WHERE' => ['vendor' => $m['vendor'], 'product' => $m['product'], 'part' => 'a', 'is_vulnerable' => 1]]), false);
-                $byCve = [];
-                foreach ($criteriaCache[$vp] as $c) {
-                    $byCve[(int) $c['plugin_vulnwatch_cves_id']][] = $c;
-                }
                 foreach ($group['versions'] as $svid => $sv) {
                     $families = array_keys($osByVersion[$svid] ?? []);
                     sort($families);
-                    foreach ($byCve as $cvePk => $criteria) {
-                        $results = [];
-                        foreach ($criteria as $c) {
-                            $ck = $c['id'] . '|' . $sv['version'] . '|' . implode(',', $families) . '|' . $m['status'] . $m['confidence'];
-                            if (isset($evalCache[$ck])) {
-                                $this->stats['cache_hits']++;
-                            } else {
-                                $evalCache[$ck] = Evaluator::evaluate($c, $sv['version'], $m, ['os_families' => $families, 'arch' => $sv['arch']]) + ['criteria_id' => (int) $c['id']];
-                                $this->stats['evaluations']++;
-                            }
-                            $results[] = $evalCache[$ck];
+                    foreach ($criteriaCache[$vp] as $c) {
+                        $ck = $c['id'] . '|' . $sv['version'] . '|' . implode(',', $families) . '|' . $m['status'] . $m['confidence'];
+                        if (isset($evalCache[$ck])) {
+                            $this->stats['cache_hits']++;
+                        } else {
+                            $evalCache[$ck] = Evaluator::evaluate($c, $sv['version'], $m, ['os_families' => $families, 'arch' => $sv['arch']]) + ['criteria_id' => (int) $c['id']];
+                            $this->stats['evaluations']++;
                         }
-                        $best = Evaluator::combine($results);
-                        $fid = $this->upsertFinding($cvePk, $sv, (int) $m['id'], $best);
-                        $touchedFindings[$fid] = true;
+                        $pending[$svid][(int) $c['plugin_vulnwatch_cves_id']][] = $evalCache[$ck] + ['mapping_id' => (int) $m['id']];
                     }
+                }
+            }
+            foreach ($pending as $svid => $byCve) {
+                foreach ($byCve as $cvePk => $results) {
+                    $best = Evaluator::combine($results);
+                    $fid = $this->upsertFinding($cvePk, $group['versions'][$svid], $best['mapping_id'], $best);
+                    $touchedFindings[$fid] = true;
                 }
             }
         }
