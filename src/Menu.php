@@ -5,10 +5,8 @@ namespace GlpiPlugin\Vulnwatch;
 use CommonGLPI;
 use Session;
 
-final class Menu extends CommonGLPI
+final class Menu extends Compat\PluginRightItem
 {
-    public static $rightname = 'plugin_vulnwatch';
-
     public static function getTypeName($nb = 0)
     {
         return __('Vulnérabilités', 'vulnwatch');

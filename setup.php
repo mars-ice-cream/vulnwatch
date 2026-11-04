@@ -15,9 +15,40 @@ use GlpiPlugin\Vulnwatch\Menu;
 use GlpiPlugin\Vulnwatch\Profile as VulnwatchProfile;
 
 define('PLUGIN_VULNWATCH_VERSION', '1.0.0');
-// GLPI 11.0.x testé ; GLPI 12 déclaré mais non testé (borne max exclusive).
+// Testé sur GLPI 11.0.9 et 12.0.1 (classes de base par version dans compat/).
 define('PLUGIN_VULNWATCH_MIN_GLPI', '11.0.0');
 define('PLUGIN_VULNWATCH_MAX_GLPI', '12.99.99');
+
+/**
+ * Compatibilité GLPI 11 / 12 dans un seul paquet : GLPI 12 type les propriétés héritées
+ * ($rightname, $dohistory…) et PHP impose une déclaration identique dans les classes filles.
+ * Les classes de base GlpiPlugin\Vulnwatch\Compat\* sont donc chargées depuis compat/glpi11 ou compat/glpi12.
+ */
+function plugin_vulnwatch_register_compat_autoload(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+    $dir = __DIR__ . '/compat/' . (version_compare(plugin_vulnwatch_glpi_version(), '12.0.0-dev', '>=') ? 'glpi12' : 'glpi11');
+    spl_autoload_register(static function (string $class) use ($dir): void {
+        $prefix = 'GlpiPlugin\\Vulnwatch\\Compat\\';
+        if (str_starts_with($class, $prefix)) {
+            $file = $dir . '/' . substr($class, strlen($prefix)) . '.php';
+            if (is_file($file)) {
+                require_once $file;
+            }
+        }
+    });
+}
+
+function plugin_vulnwatch_glpi_version(): string
+{
+    return defined('GLPI_VERSION') ? GLPI_VERSION : '11.0.0';
+}
+
+plugin_vulnwatch_register_compat_autoload();
 
 function plugin_version_vulnwatch(): array
 {

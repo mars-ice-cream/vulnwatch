@@ -17,7 +17,7 @@ if (isset($_POST['review_action'])) {
         'INNER JOIN' => ['glpi_plugin_vulnwatch_feeds AS fe' => ['ON' => ['b' => 'plugin_vulnwatch_feeds_id', 'fe' => 'id']]],
         'WHERE' => ['b.id' => $bid, $scope]])->current();
     if (!$b) {
-        Html::displayRightError();
+        throw new \Glpi\Exception\Http\AccessDeniedHttpException();
     }
     $action = (string) $_POST['review_action'];
     $upd = ['users_id_review' => Session::getLoginUserID(), 'date_review' => $_SESSION['glpi_currenttime']];

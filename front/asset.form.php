@@ -9,7 +9,7 @@ Session::checkRight(Menu::$rightname, UPDATE);
 $itemtype = (string) ($_POST['itemtype'] ?? '');
 $id = (int) ($_POST['items_id'] ?? 0);
 if (!in_array($itemtype, Inventory::TAB_ITEMTYPES, true) || !($item = getItemForItemtype($itemtype)) || !$item->can($id, UPDATE)) {
-    Html::displayRightError();
+    throw new \Glpi\Exception\Http\AccessDeniedHttpException();
 }
 if (isset($_POST['save_context'])) {
     /** @var DBmysql $DB */

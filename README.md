@@ -1,4 +1,4 @@
-# VulnWatch : veille vulnérabilités pour GLPI 11
+# VulnWatch : veille vulnérabilités pour GLPI 11 et 12
 
 VulnWatch croise l'inventaire déjà remonté par GLPI Agent avec des sources de vulnérabilités (NVD, CISA KEV, flux RSS/Atom configurables) et suit les corrections au fil des inventaires. Il ne demande pas d'agent supplémentaire ni de scanner réseau, et fonctionne sans OpenVAS ni Wazuh.
 
@@ -26,7 +26,7 @@ Un inventaire ancien, une machine qui ne remonte plus ou une source en erreur ne
 
 ## Installation
 
-Prérequis : GLPI 11.0.x, PHP ≥ 8.2 (extensions curl, dom, libxml, json), inventaire natif activé, actions automatiques GLPI en mode CLI recommandé.
+Prérequis : GLPI 11.0.x (PHP ≥ 8.2) ou GLPI 12.0.x (PHP ≥ 8.3, exigé par GLPI 12), extensions curl, dom, libxml et json, inventaire natif activé, actions automatiques GLPI en mode CLI recommandé.
 
 ```bash
 cd /var/www/glpi/plugins
@@ -53,6 +53,17 @@ L'installation crée 13 tables `glpi_plugin_vulnwatch_*`, deux droits de profil 
 | `vulnwatchTickets` | 1 j | tickets automatiques, seulement dans les entités qui les ont activés |
 
 Commande manuelle : `php bin/console plugins:vulnwatch:run --step=collect|analyze|tickets|all`.
+
+## Compatibilité GLPI 11 / 12
+
+Un seul paquet fonctionne sur les deux versions. Il a été testé sur GLPI 11.0.9 et 12.0.1 : installation, désinstallation, chargement de toutes les classes, suite d'intégration complète, pages en navigateur et action automatique lancée par le cron natif.
+
+- **Propriétés typées.** GLPI 12 type les propriétés héritées (`$rightname`, `$dohistory`) et PHP exige la même déclaration dans les classes filles. Les classes de base `GlpiPlugin\Vulnwatch\Compat\*` sont donc chargées depuis `compat/glpi11/` ou `compat/glpi12/` selon `GLPI_VERSION` (voir `setup.php`).
+- **Fonctions supprimées.** `Html::displayRightError()` est remplacé par `Glpi\Exception\Http\AccessDeniedHttpException`, disponible dans les deux versions.
+- **CSRF.** GLPI 11 utilise un jeton ajouté par `Html::closeForm()`, GLPI 12 contrôle les en-têtes `Origin` et `Sec-Fetch-Site`. Le plugin n'a rien à faire : une requête intersite forgée est refusée (403) dans les deux cas.
+- **Inventaire en GLPI 12.** GLPI 12 exige de choisir explicitement le mode d'authentification des agents (*Administration > Inventaire > Configuration > En-tête d'autorisation*). Sans ce réglage, l'inventaire est refusé et le plugin n'a rien à analyser.
+
+Pour vérifier un autre correctif de GLPI : `php tests/load_classes.php /chemin/glpi` charge chaque classe du plugin sur le cœur indiqué.
 
 ## Configuration
 
@@ -138,9 +149,12 @@ Le rapprochement est **entièrement local** : aucun nom de logiciel, version, ma
 
 ```bash
 php tests/unit.php                                       # logique pure, sans GLPI
+php tests/load_classes.php /chemin/glpi                  # compatibilité des classes avec ce cœur GLPI
 php -S 127.0.0.2:8099 tests/fixture_router.php &         # serveur de jeux de test (NVD/KEV/flux)
 php tests/integration.php /chemin/glpi http://127.0.0.1:8088   # instance de TEST uniquement
 ```
+
+Résultats actuels : 77 tests unitaires et 70 tests d'intégration réussis sur GLPI 11.0.9 comme sur GLPI 12.0.1.
 
 Le test d'intégration vide les tables du plugin et crée des entités et actifs « VW » : **ne jamais le lancer en production**.
 

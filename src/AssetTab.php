@@ -7,11 +7,9 @@ use Html;
 use Session;
 
 /** Onglet « Vulnérabilités » sur les fiches d'actifs (mécanisme natif addtabon). */
-final class AssetTab extends CommonGLPI
+final class AssetTab extends Compat\PluginRightItem
 {
     public const SUPPORTED_ITEMTYPES = Inventory::TAB_ITEMTYPES;
-
-    public static $rightname = 'plugin_vulnwatch';
 
     public static function getTypeName($nb = 0)
     {

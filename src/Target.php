@@ -10,10 +10,8 @@ use GlpiPlugin\Vulnwatch\Matching\VersionComparator;
  * Version cible approuvée et fin de support, définies par l'administrateur pour une entité.
  * Distinct de la CVE : « en dessous de la cible » ou « fin de support » ne signifie pas « vulnérable ».
  */
-final class Target extends CommonDBTM
+final class Target extends Compat\ConfigRightDbtm
 {
-    public static $rightname = 'plugin_vulnwatch_config';
-    public $dohistory = true;
 
     public static function getTypeName($nb = 0)
     {

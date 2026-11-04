@@ -10,10 +10,8 @@ use GlpiPlugin\Vulnwatch\Source\FeedParser;
  * Flux RSS/Atom configuré par un administrateur.
  * Cloisonnement : entités destinataires = entities_id + is_recursive (mécanisme natif).
  */
-final class Feed extends CommonDBTM
+final class Feed extends Compat\ConfigRightDbtm
 {
-    public static $rightname = 'plugin_vulnwatch_config';
-    public $dohistory = true;
 
     public static function getTypeName($nb = 0)
     {

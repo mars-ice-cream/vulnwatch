@@ -33,7 +33,7 @@ if (!empty($_POST)) {
     } elseif (isset($_POST['save_entity'])) {
         $eid = (int) $_POST['entities_id'];
         if (!Session::haveAccessToEntity($eid)) {
-            Html::displayRightError();
+            throw new \Glpi\Exception\Http\AccessDeniedHttpException();
         }
         $data = ['auto_ticket' => !empty($_POST['auto_ticket']) ? 1 : 0, 'auto_min_confidence' => max(70, min(100, (int) $_POST['auto_min_confidence'])),
             'auto_min_priority' => max(0, min(100, (int) $_POST['auto_min_priority'])), 'date_mod' => $_SESSION['glpi_currenttime']];

@@ -16,8 +16,6 @@ use Session;
  */
 final class Profile extends \Profile
 {
-    public static $rightname = 'profile';
-
     public const RIGHTS = ['plugin_vulnwatch', 'plugin_vulnwatch_config'];
 
     public static function getAllRights(): array

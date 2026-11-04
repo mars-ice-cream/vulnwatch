@@ -19,7 +19,7 @@ final class RunCommand extends AbstractCommand
         $this->addOption('step', 's', InputOption::VALUE_REQUIRED, 'collect, analyze, tickets ou all', 'all');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $step = (string) $input->getOption('step');
         if (in_array($step, ['collect', 'all'], true)) {
