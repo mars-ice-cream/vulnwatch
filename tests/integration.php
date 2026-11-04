@@ -187,6 +187,12 @@ check('prep', 'Notepad++ inventorié sans version', $npp !== null && trim((strin
 
 // ---------------------------------------------------------------------------
 section('Flux et sources');
+$n1 = Feed::installOfficialFeeds();
+$n2 = Feed::installOfficialFeeds();
+check('flux_officiels', 'flux officiels CERT-FR ajoutés une seule fois (racine, récursifs)', $n1 === 2 && $n2 === 0
+    && (int) $DB->request(['COUNT' => 'c', 'FROM' => 'glpi_plugin_vulnwatch_feeds', 'WHERE' => ['url' => ['LIKE', 'https://www.cert.ssi.gouv.fr/%'], 'entities_id' => 0, 'is_recursive' => 1]])->current()['c'] === 2, [$n1, $n2]);
+// Pas d'accès Internet dans l'environnement de test : on les désactive pour la suite
+$DB->update('glpi_plugin_vulnwatch_feeds', ['is_active' => 0], ['url' => ['LIKE', 'https://www.cert.ssi.gouv.fr/%']]);
 $feed = new Feed();
 $fA = $feed->add(['name' => 'CERT-FR (test)', 'url' => FIX . '/feeds/certfr.xml', 'entities_id' => $entA, 'is_recursive' => 0, 'frequency' => 60, 'is_active' => 1]);
 $fB = $feed->add(['name' => 'Éditeur (test)', 'url' => FIX . '/feeds/vendor.atom', 'entities_id' => 0, 'is_recursive' => 1, 'frequency' => 60, 'is_active' => 1]);

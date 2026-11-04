@@ -99,6 +99,37 @@ final class Feed extends Compat\ConfigRightDbtm
         return $input;
     }
 
+    /**
+     * Flux officiels proposés d'office (entité racine, récursifs, actifs).
+     * Ajoutés à la première installation, et à la demande depuis la liste des flux s'ils ont été supprimés.
+     */
+    public const OFFICIAL_FEEDS = [
+        ['CERT-FR – Avis de sécurité', 'https://www.cert.ssi.gouv.fr/avis/feed/', 'Avis de sécurité du CERT-FR (ANSSI) : vulnérabilités et correctifs, avec leurs identifiants CVE.'],
+        ['CERT-FR – Alertes de sécurité', 'https://www.cert.ssi.gouv.fr/alerte/feed/', 'Alertes du CERT-FR (ANSSI) : vulnérabilités critiques exploitées ou menaces imminentes.'],
+    ];
+
+    /** Ajoute les flux officiels absents (comparaison sur l'URL). @return int nombre de flux ajoutés */
+    public static function installOfficialFeeds(): int
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+        $existing = array_map(static fn($r) => rtrim(strtolower((string) $r['url']), '/'), iterator_to_array($DB->request(['SELECT' => ['url'], 'FROM' => self::getTable()]), false));
+        $now = date('Y-m-d H:i:s');
+        $added = 0;
+        foreach (self::OFFICIAL_FEEDS as [$name, $url, $comment]) {
+            if (in_array(rtrim(strtolower($url), '/'), $existing, true)) {
+                continue;
+            }
+            $DB->insert(self::getTable(), [
+                'entities_id' => 0, 'is_recursive' => 1, 'name' => $name, 'url' => $url, 'is_active' => 1, 'frequency' => 60,
+                'last_status' => 'never', 'comment' => $comment . ' Flux officiel ajouté automatiquement par VulnWatch.',
+                'date_creation' => $now, 'date_mod' => $now,
+            ]);
+            $added++;
+        }
+        return $added;
+    }
+
     /** Flux dus pour une récupération. */
     public static function getDueFeeds(int $limit = 20): array
     {
@@ -251,7 +282,7 @@ final class Feed extends Compat\ConfigRightDbtm
         $tab[] = ['id' => 2, 'table' => $t, 'field' => 'url', 'name' => __('URL'), 'datatype' => 'string'];
         $tab[] = ['id' => 3, 'table' => $t, 'field' => 'is_active', 'name' => __('Active'), 'datatype' => 'bool'];
         $tab[] = ['id' => 4, 'table' => $t, 'field' => 'frequency', 'name' => __('Fréquence (minutes)', 'vulnwatch'), 'datatype' => 'integer'];
-        $tab[] = ['id' => 5, 'table' => $t, 'field' => 'last_status', 'name' => __('État de synchronisation', 'vulnwatch'), 'datatype' => 'string'];
+        $tab[] = ['id' => 5, 'table' => $t, 'field' => 'last_status', 'name' => __('État de synchronisation', 'vulnwatch'), 'datatype' => 'specific', 'searchtype' => ['equals', 'notequals']];
         $tab[] = ['id' => 6, 'table' => $t, 'field' => 'last_success', 'name' => __('Dernière réussite', 'vulnwatch'), 'datatype' => 'datetime'];
         $tab[] = ['id' => 7, 'table' => $t, 'field' => 'last_error', 'name' => __('Dernière erreur', 'vulnwatch'), 'datatype' => 'text'];
         $tab[] = ['id' => 8, 'table' => $t, 'field' => 'last_items_count', 'name' => __('Articles (dernière récupération)', 'vulnwatch'), 'datatype' => 'integer'];
@@ -265,6 +296,28 @@ final class Feed extends Compat\ConfigRightDbtm
         $this->addDefaultFormTab($ong);
         $this->addStandardTab(\Log::class, $ong, $options);
         return $ong;
+    }
+
+    public static function getSpecificValueToDisplay($field, $values, array $options = [])
+    {
+        if (!is_array($values)) {
+            $values = [$field => $values];
+        }
+        if ($field === 'last_status') {
+            return Ui::syncBadge((string) $values[$field]);
+        }
+        return parent::getSpecificValueToDisplay($field, $values, $options);
+    }
+
+    public static function getSpecificValueToSelect($field, $name = '', $values = '', array $options = [])
+    {
+        if (!is_array($values)) {
+            $values = [$field => $values];
+        }
+        if ($field === 'last_status') {
+            return \Dropdown::showFromArray($name, ['ok' => 'OK', 'error' => 'Erreur', 'never' => 'Jamais synchronisé'], ['value' => $values[$field], 'display' => false]);
+        }
+        return parent::getSpecificValueToSelect($field, $name, $values, $options);
     }
 
     public function showForm($ID, array $options = [])

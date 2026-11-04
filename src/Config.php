@@ -26,6 +26,8 @@ final class Config
         'kev_url'              => 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json',
         'kev_last_sync'        => '',
         'kev_last_error'       => '',
+        // Flux officiels déjà proposés à l'installation
+        'official_feeds_seeded' => '0',
         // Analyse
         'stale_days'           => '30',
         // Sécurité des récupérations HTTP

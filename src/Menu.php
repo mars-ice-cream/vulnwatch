@@ -40,6 +40,21 @@ final class Menu extends Compat\PluginRightItem
             'icon'  => self::getIcon(),
             'options' => [],
         ];
+        foreach (self::pages() as $key => [$title, $page, $icon]) {
+            $menu['options'][$key] = ['title' => $title, 'page' => self::url($page), 'icon' => $icon];
+            if (in_array($key, ['feed', 'target'], true)) {
+                $menu['options'][$key]['links'] = ['search' => self::url($page)];
+                if (Session::haveRight('plugin_vulnwatch_config', UPDATE)) {
+                    $menu['options'][$key]['links']['add'] = self::url($key . '.form.php');
+                }
+            }
+        }
+        return $menu;
+    }
+
+    /** Pages du plugin visibles avec les droits de la session. @return array<string,array{0:string,1:string,2:string}> */
+    public static function pages(): array
+    {
         $links = [
             'dashboard' => [__('Tableau de bord', 'vulnwatch'), 'dashboard.php', 'ti ti-layout-dashboard'],
             'cve'       => [__('Par CVE', 'vulnwatch'), 'cve.php', 'ti ti-bug'],
@@ -52,15 +67,6 @@ final class Menu extends Compat\PluginRightItem
             $links['target'] = [__('Versions cibles', 'vulnwatch'), 'target.php', 'ti ti-target'];
             $links['config'] = [__('Configuration', 'vulnwatch'), 'config.php', 'ti ti-settings'];
         }
-        foreach ($links as $key => [$title, $page, $icon]) {
-            $menu['options'][$key] = ['title' => $title, 'page' => self::url($page), 'icon' => $icon];
-            if (in_array($key, ['feed', 'target'], true)) {
-                $menu['options'][$key]['links'] = ['search' => self::url($page)];
-                if (Session::haveRight('plugin_vulnwatch_config', UPDATE)) {
-                    $menu['options'][$key]['links']['add'] = self::url($key . '.form.php');
-                }
-            }
-        }
-        return $menu;
+        return $links;
     }
 }

@@ -15,7 +15,7 @@ if (!empty($_POST)) {
     Session::checkRight('plugin_vulnwatch_config', UPDATE);
     if (isset($_POST['save_config'])) {
         $in = array_intersect_key($_POST, Config::DEFAULTS);
-        unset($in['nvd_last_sync'], $in['nvd_incr_window_end'], $in['nvd_incr_index'], $in['kev_last_sync'], $in['kev_last_error']);
+        unset($in['official_feeds_seeded'], $in['nvd_last_sync'], $in['nvd_incr_window_end'], $in['nvd_incr_index'], $in['kev_last_sync'], $in['kev_last_error']);
         foreach (['nvd_enabled', 'kev_enabled', 'kev_track_all'] as $b) {
             $in[$b] = !empty($_POST[$b]) ? '1' : '0';
         }

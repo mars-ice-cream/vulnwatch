@@ -124,5 +124,17 @@ final class Ui
     public static function header(string $title, string $option): void
     {
         \Html::header($title, '', 'tools', Menu::class, $option);
+        self::nav($option);
+    }
+
+    /** Barre de navigation entre les pages du plugin (le menu GLPI n'affiche que l'entrée principale). */
+    public static function nav(string $active): void
+    {
+        echo "<ul class='nav nav-pills mb-3 flex-wrap gap-1'>";
+        foreach (Menu::pages() as $key => [$title, $page, $icon]) {
+            $cls = $key === $active ? 'nav-link active' : 'nav-link';
+            echo "<li class='nav-item'><a class='" . $cls . "' href='" . self::e(Menu::url($page)) . "'><i class='" . self::e($icon) . " me-1'></i>" . self::e($title) . '</a></li>';
+        }
+        echo '</ul>';
     }
 }

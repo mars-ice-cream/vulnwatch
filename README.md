@@ -83,7 +83,13 @@ Pour vérifier un autre correctif de GLPI : `php tests/load_classes.php /chemin/
 
 Chaque flux a : nom, URL, activation, fréquence (15 min à 7 jours), entité destinataire (récursive ou non), filtres facultatifs (mots à inclure ou exclure), bouton *Tester la récupération* (n'enregistre rien), bouton *Synchroniser maintenant*. Son état indique la dernière tentative, la dernière réussite et la dernière erreur.
 
-Exemple CERT-FR : `https://www.cert.ssi.gouv.fr/avis/feed/`
+**Flux officiels pré-renseignés** : à la première installation, le plugin ajoute les flux du CERT-FR (ANSSI), actifs et visibles par toutes les entités :
+- Avis de sécurité : `https://www.cert.ssi.gouv.fr/avis/feed/`
+- Alertes de sécurité : `https://www.cert.ssi.gouv.fr/alerte/feed/`
+
+Un flux officiel supprimé ne revient pas tout seul ; le bouton **Ajouter les flux officiels manquants** de la liste des flux le remet. Le bouton **Ajouter un flux** permet d'en déclarer d'autres (éditeur, constructeur, source interne autorisée).
+
+Toutes les pages du plugin ont une barre de navigation (tableau de bord, par CVE, par logiciel, veille, associations, flux, versions cibles, configuration).
 
 Fonctionnement :
 - les articles sont dédupliqués par flux et identifiant (y compris les doublons dans une même réponse) ;
@@ -154,7 +160,7 @@ php -S 127.0.0.2:8099 tests/fixture_router.php &         # serveur de jeux de te
 php tests/integration.php /chemin/glpi http://127.0.0.1:8088   # instance de TEST uniquement
 ```
 
-Résultats actuels : 77 tests unitaires et 71 tests d'intégration réussis sur GLPI 11.0.9 comme sur GLPI 12.0.1.
+Résultats actuels : 77 tests unitaires et 72 tests d'intégration réussis sur GLPI 11.0.9 comme sur GLPI 12.0.1.
 
 Le test d'intégration vide les tables du plugin et crée des entités et actifs « VW » : **ne jamais le lancer en production**.
 
