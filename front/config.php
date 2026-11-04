@@ -30,16 +30,6 @@ if (!empty($_POST)) {
         Config::set($in);
         Logger::decision('config_update', 'config', 0, array_diff_key($in, ['nvd_api_key' => 1]));
         Session::addMessageAfterRedirect(__('Configuration enregistrée.', 'vulnwatch'));
-    } elseif (isset($_POST['save_entity'])) {
-        $eid = (int) $_POST['entities_id'];
-        if (!Session::haveAccessToEntity($eid)) {
-            throw new \Glpi\Exception\Http\AccessDeniedHttpException();
-        }
-        $data = ['auto_ticket' => !empty($_POST['auto_ticket']) ? 1 : 0, 'auto_min_confidence' => max(70, min(100, (int) $_POST['auto_min_confidence'])),
-            'auto_min_priority' => max(0, min(100, (int) $_POST['auto_min_priority'])), 'date_mod' => $_SESSION['glpi_currenttime']];
-        $DB->updateOrInsert('glpi_plugin_vulnwatch_entityconfigs', $data, ['entities_id' => $eid]);
-        Logger::decision('entity_automation', 'entity', $eid, $data, $eid);
-        Session::addMessageAfterRedirect(__('Paramètres de l\'entité enregistrés.', 'vulnwatch'));
     } elseif (isset($_POST['run_collect'])) {
         Cron::cronVulnwatchCollect();
         Session::addMessageAfterRedirect(__('Collecte exécutée (voir le journal vulnwatch.log).', 'vulnwatch'));
@@ -85,24 +75,6 @@ foreach (Cron::connectors() as $c) {
     echo '<li><strong>' . Ui::e($c->getLabel()) . '</strong> (' . ($c->isEnabled() ? 'activé' : 'désactivé') . ') : ' . Ui::e($c->describeOutboundData()) . '</li>';
 }
 echo '</ul>';
-
-echo "<h3 class='mt-4'>Tickets automatiques par entité</h3><p class='small text-muted'>Désactivés par défaut. Seules les correspondances établies, au-dessus des seuils et sur des actifs à l'inventaire récent, sont regroupées dans des tickets de campagne.</p>";
-echo "<table class='table table-sm w-auto'><thead><tr><th>Entité</th><th>Actif</th><th>Confiance min.</th><th>Priorité min.</th><th></th></tr></thead><tbody>";
-$cfgs = [];
-foreach ($DB->request(['FROM' => 'glpi_plugin_vulnwatch_entityconfigs']) as $r) {
-    $cfgs[(int) $r['entities_id']] = $r;
-}
-foreach ($_SESSION['glpiactiveentities'] as $eid) {
-    $c = $cfgs[(int) $eid] ?? ['auto_ticket' => 0, 'auto_min_confidence' => 90, 'auto_min_priority' => 70];
-    echo "<tr><form method='post' action='" . Ui::e(Menu::url('config.php')) . "'><td>" . Ui::e(Dropdown::getDropdownName('glpi_entities', (int) $eid)) . Html::hidden('entities_id', ['value' => $eid]) . '</td>'
-        . "<td><input type='checkbox' class='form-check-input' name='auto_ticket' value='1'" . ($c['auto_ticket'] ? ' checked' : '') . '></td>'
-        . "<td><input class='form-control form-control-sm' type='number' min='70' max='100' name='auto_min_confidence' value='" . (int) $c['auto_min_confidence'] . "'></td>"
-        . "<td><input class='form-control form-control-sm' type='number' min='0' max='100' name='auto_min_priority' value='" . (int) $c['auto_min_priority'] . "'></td><td>"
-        . ($canEdit ? Html::submit(_sx('button', 'Save'), ['name' => 'save_entity', 'class' => 'btn btn-sm btn-secondary']) : '') . '</td>';
-    Html::closeForm();
-    echo '</tr>';
-}
-echo '</tbody></table>';
 
 echo "<h3 class='mt-4'>Journal des décisions</h3><table class='table table-sm small'><thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Objet</th><th>Détails</th></tr></thead><tbody>";
 foreach ($DB->request(['FROM' => 'glpi_plugin_vulnwatch_decisionlogs', 'WHERE' => [Ui::entityCriteria('glpi_plugin_vulnwatch_decisionlogs')], 'ORDER' => 'id DESC', 'LIMIT' => 100]) as $l) {

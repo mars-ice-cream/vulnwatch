@@ -1,6 +1,6 @@
 <?php
 
-use GlpiPlugin\Vulnwatch\AssetTab;
+use GlpiPlugin\Vulnwatch\CveView;
 use GlpiPlugin\Vulnwatch\Config;
 use GlpiPlugin\Vulnwatch\Menu;
 use GlpiPlugin\Vulnwatch\Report;
@@ -70,10 +70,10 @@ if ($counts === []) {
 }
 echo '</tbody></table>';
 
-// Priorités
-$top = Report::items(['i.state' => 'active', 'f.status' => ['established', 'to_check']], 5000);
-echo '<h3>' . __('À traiter en priorité', 'vulnwatch') . '</h3>';
+// Priorités : une entrée par CVE, les actifs à l'intérieur
+$top = Report::items(['i.state' => ['active', 'unverified'], 'f.status' => ['established', 'to_check']], 5000);
+echo '<h3>' . __('CVE à traiter en priorité', 'vulnwatch') . '</h3>';
 echo "<p class='small text-muted'>" . __('Priorité = gravité + exploitation connue + criticité + exposition (détail au survol). La confiance mesure la fiabilité de la détection, séparément.', 'vulnwatch') . '</p>';
-AssetTab::findingsTable(array_slice($top, 0, 50), Session::haveRight(Menu::$rightname, CREATE) && Session::haveRight('ticket', CREATE), false, true);
+CveView::render($top, Session::haveRight(Menu::$rightname, CREATE) && Session::haveRight('ticket', CREATE), 3, 15);
 echo '</div>';
 Html::footer();

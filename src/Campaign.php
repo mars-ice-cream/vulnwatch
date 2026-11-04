@@ -22,7 +22,7 @@ final class Campaign
      * @param list<int> $findingItemIds lignes de glpi_plugin_vulnwatch_findings_items
      * @return array{tickets_created:int, tickets_updated:int, items_added:int, skipped:int, tickets:list<int>, errors:list<string>}
      */
-    public static function addFindingItems(array $findingItemIds, bool $auto = false): array
+    public static function addFindingItems(array $findingItemIds): array
     {
         /** @var \DBmysql $DB */
         global $DB;
@@ -46,7 +46,7 @@ final class Campaign
 
         $groups = [];
         foreach ($rows as $r) {
-            if (!$auto && !Session::haveAccessToEntity((int) $r['entities_id'])) {
+            if (!Session::haveAccessToEntity((int) $r['entities_id'])) {
                 $report['skipped']++;
                 continue; // isolation des entités, même si l'identifiant est forgé
             }
@@ -67,11 +67,11 @@ final class Campaign
                     continue;
                 }
                 if ($campaign === null) {
-                    $campaign = self::create($entityId, $productKey, $target, $list, $auto);
+                    $campaign = self::create($entityId, $productKey, $target, $list);
                     $report['tickets_created']++;
                     $new = $list;
                 } else {
-                    self::appendFollowup((int) $campaign['tickets_id'], $new, $auto);
+                    self::appendFollowup((int) $campaign['tickets_id'], $new);
                     $report['tickets_updated']++;
                 }
                 $report['tickets'][] = (int) $campaign['tickets_id'];
@@ -83,7 +83,8 @@ final class Campaign
                     $DB->update('glpi_plugin_vulnwatch_findings_items', ['plugin_vulnwatch_campaigns_id' => $campaign['id']], ['id' => $r['id']]);
                     $report['items_added']++;
                 }
-                Logger::decision($auto ? 'ticket_auto' : 'ticket_manual', 'campaign', (int) $campaign['id'],
+                self::refreshTitle((int) $campaign['tickets_id'], (string) $list[0]['software'], $target);
+                Logger::decision('ticket_manual', 'campaign', (int) $campaign['id'],
                     ['ticket' => (int) $campaign['tickets_id'], 'product' => $productKey, 'target' => $target, 'findings_items' => array_column($new, 'id')], $entityId);
             } catch (\Throwable $e) {
                 $report['errors'][] = $productKey . ' : ' . $e->getMessage();
@@ -128,12 +129,12 @@ final class Campaign
         return null;
     }
 
-    private static function create(int $entityId, string $productKey, string $target, array $list, bool $auto): array
+    private static function create(int $entityId, string $productKey, string $target, array $list): array
     {
         /** @var \DBmysql $DB */
         global $DB;
         $software = (string) $list[0]['software'];
-        $name = sprintf('[Vulnérabilités] %s%s — %d actif(s)', $software, $target !== '' ? ' → ' . $target : '', count(array_unique(array_map(static fn($r) => $r['itemtype'] . $r['items_id'], $list))));
+        $name = self::title($software, $target, count(array_unique(array_map(static fn($r) => $r['itemtype'] . $r['items_id'], $list))));
         $ticket = new Ticket();
         $input = [
             'name'        => mb_substr($name, 0, 255),
@@ -141,7 +142,6 @@ final class Campaign
             'entities_id' => $entityId,
             'type'        => Ticket::DEMAND_TYPE,
             'urgency'     => self::urgency($list),
-            '_disablenotif' => $auto,
         ];
         $id = $ticket->add($input);
         if (!$id) {
@@ -149,15 +149,34 @@ final class Campaign
         }
         $now = date('Y-m-d H:i:s');
         $DB->insert(self::TABLE, ['entities_id' => $entityId, 'name' => mb_substr($name, 0, 255), 'product_key' => $productKey, 'target_version' => $target,
-            'tickets_id' => $id, 'is_open' => 1, 'is_auto' => $auto ? 1 : 0, 'users_id' => (int) Session::getLoginUserID(), 'date_creation' => $now, 'date_mod' => $now]);
+            'tickets_id' => $id, 'is_open' => 1, 'users_id' => (int) Session::getLoginUserID(), 'date_creation' => $now, 'date_mod' => $now]);
         return ['id' => (int) $DB->insertId(), 'tickets_id' => (int) $id];
     }
 
-    private static function appendFollowup(int $ticketId, array $new, bool $auto): void
+    private static function appendFollowup(int $ticketId, array $new): void
     {
         $fu = new ITILFollowup();
         $fu->add(['itemtype' => Ticket::class, 'items_id' => $ticketId, 'is_private' => 0,
-            'content' => '<p>VulnWatch : nouveaux éléments rattachés à cette campagne.</p>' . self::renderContent($new, null, false), '_disablenotif' => $auto]);
+            'content' => '<p>VulnWatch : nouveaux éléments rattachés à cette campagne.</p>' . self::renderContent($new, null, false)]);
+    }
+
+    private static function title(string $software, string $target, int $assets): string
+    {
+        return mb_substr(sprintf('[Vulnérabilités] %s%s — %d actif(s)', $software, $target !== '' ? ' → ' . $target : '', $assets), 0, 255);
+    }
+
+    /** Le titre reflète le nombre réel d'actifs liés au ticket, y compris ceux ajoutés par suivi. */
+    private static function refreshTitle(int $ticketId, string $software, string $target): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+        $n = (int) $DB->request(['COUNT' => 'c', 'FROM' => 'glpi_items_tickets', 'WHERE' => ['tickets_id' => $ticketId]])->current()['c'];
+        $title = self::title($software, $target, $n);
+        $t = new Ticket();
+        if ($t->getFromDB($ticketId) && $t->fields['name'] !== $title) {
+            $t->update(['id' => $ticketId, 'name' => $title]);
+            $DB->update(self::TABLE, ['name' => $title, 'date_mod' => date('Y-m-d H:i:s')], ['tickets_id' => $ticketId]);
+        }
     }
 
     private static function urgency(array $list): int
@@ -193,42 +212,6 @@ final class Campaign
     {
         $item = getItemForItemtype($itemtype);
         return ($item && $item->getFromDB($id)) ? (string) $item->fields['name'] : '';
-    }
-
-    /** Mode automatique : uniquement les entités qui l'ont activé, uniquement les correspondances fiables. */
-    public static function runAutomatic(): array
-    {
-        /** @var \DBmysql $DB */
-        global $DB;
-        $total = ['tickets_created' => 0, 'tickets_updated' => 0, 'items_added' => 0, 'skipped' => 0, 'tickets' => [], 'errors' => []];
-        foreach ($DB->request(['FROM' => 'glpi_plugin_vulnwatch_entityconfigs', 'WHERE' => ['auto_ticket' => 1]]) as $cfg) {
-            $ids = [];
-            foreach ($DB->request([
-                'SELECT' => ['i.id', 'i.itemtype', 'i.items_id', 'c.cvss_score', 'c.cvss_version', 'c.severity', 'c.is_kev', 'c.kev_due_date', 'c.epss_score'],
-                'FROM' => 'glpi_plugin_vulnwatch_findings_items AS i',
-                'INNER JOIN' => [
-                    'glpi_plugin_vulnwatch_findings AS f' => ['ON' => ['i' => 'plugin_vulnwatch_findings_id', 'f' => 'id']],
-                    'glpi_plugin_vulnwatch_cves AS c' => ['ON' => ['i' => 'plugin_vulnwatch_cves_id', 'c' => 'id']],
-                ],
-                'WHERE' => ['i.entities_id' => (int) $cfg['entities_id'], 'i.state' => 'active', 'i.plugin_vulnwatch_campaigns_id' => 0,
-                    'f.status' => 'established', 'f.confidence' => ['>=', (int) $cfg['auto_min_confidence']]],
-            ]) as $r) {
-                if (Inventory::isStale(Inventory::assetState($r['itemtype'], (int) $r['items_id'])['last_inventory_update'])) {
-                    continue;
-                }
-                $p = Priority::compute($r, Priority::assetContext($r['itemtype'], (int) $r['items_id']));
-                if ($p['score'] >= (int) $cfg['auto_min_priority']) {
-                    $ids[] = (int) $r['id'];
-                }
-            }
-            $rep = self::addFindingItems($ids, true);
-            foreach (['tickets_created', 'tickets_updated', 'items_added', 'skipped'] as $k) {
-                $total[$k] += $rep[$k];
-            }
-            $total['tickets'] = array_merge($total['tickets'], $rep['tickets']);
-            $total['errors'] = array_merge($total['errors'], $rep['errors']);
-        }
-        return $total;
     }
 
     public static function normalizeKey(string $software): string

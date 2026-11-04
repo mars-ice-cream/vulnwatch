@@ -238,25 +238,12 @@ return [
         `target_version` varchar(128) NOT NULL DEFAULT '',
         `tickets_id` int unsigned NOT NULL DEFAULT '0',
         `is_open` tinyint NOT NULL DEFAULT '1',
-        `is_auto` tinyint NOT NULL DEFAULT '0',
         `users_id` int unsigned NOT NULL DEFAULT '0',
         `date_creation` timestamp NULL DEFAULT NULL,
         `date_mod` timestamp NULL DEFAULT NULL,
         PRIMARY KEY (`id`),
         KEY `lookup` (`entities_id`, `product_key`(150), `target_version`(50), `is_open`),
         KEY `tickets_id` (`tickets_id`)
-    ) $opts",
-
-    // Paramètres par entité (automatisation des tickets désactivée par défaut)
-    'glpi_plugin_vulnwatch_entityconfigs' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_vulnwatch_entityconfigs` (
-        `id` int unsigned NOT NULL AUTO_INCREMENT,
-        `entities_id` int unsigned NOT NULL,
-        `auto_ticket` tinyint NOT NULL DEFAULT '0',
-        `auto_min_confidence` tinyint unsigned NOT NULL DEFAULT '90',
-        `auto_min_priority` tinyint unsigned NOT NULL DEFAULT '70',
-        `date_mod` timestamp NULL DEFAULT NULL,
-        PRIMARY KEY (`id`),
-        UNIQUE KEY `entities_id` (`entities_id`)
     ) $opts",
 
     // Journal des décisions manuelles et exceptions

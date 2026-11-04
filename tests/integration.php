@@ -303,8 +303,10 @@ $r4 = Campaign::addFindingItems([(int) $a3['id']]);
 $nFu = (int) $DB->request(['COUNT' => 'c', 'FROM' => 'glpi_itilfollowups', 'WHERE' => ['itemtype' => 'Ticket', 'items_id' => $campA['tickets_id']]])->current()['c'];
 $nIt = (int) $DB->request(['COUNT' => 'c', 'FROM' => 'glpi_items_tickets', 'WHERE' => ['tickets_id' => $campA['tickets_id']]])->current()['c'];
 check('tickets', 'nouvelle machine de la même campagne : ticket existant complété (1 suivi, 2 actifs)', $r4['tickets_updated'] === 1 && $r4['tickets_created'] === 0 && $nFu === 1 && $nIt === 2, [$r4, $nFu, $nIt]);
-$autoRep = Campaign::runAutomatic();
-check('tickets', 'automatisation désactivée par défaut : rien créé', $autoRep['tickets_created'] === 0 && $autoRep['tickets_updated'] === 0, $autoRep);
+$tk->getFromDB((int) $campA['tickets_id']);
+check('tickets', 'titre du ticket mis à jour avec le nombre réel d\'actifs (2)', str_contains($tk->fields['name'], '2 actif(s)'), $tk->fields['name']);
+$nCron = (int) $DB->request(['COUNT' => 'c', 'FROM' => 'glpi_crontasks', 'WHERE' => ['itemtype' => ['LIKE', '%Vulnwatch%'], 'name' => ['LIKE', '%icket%']]])->current()['c'];
+check('tickets', 'aucune action automatique de création de tickets', $nCron === 0, $nCron);
 
 // ---------------------------------------------------------------------------
 section('Suivi des corrections');

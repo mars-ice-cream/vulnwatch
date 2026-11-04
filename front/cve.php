@@ -2,6 +2,7 @@
 
 use GlpiPlugin\Vulnwatch\AssetTab;
 use GlpiPlugin\Vulnwatch\Cve;
+use GlpiPlugin\Vulnwatch\CveView;
 use GlpiPlugin\Vulnwatch\Menu;
 use GlpiPlugin\Vulnwatch\Report;
 use GlpiPlugin\Vulnwatch\Ui;
@@ -47,52 +48,44 @@ if ($id > 0 && ($cve = Cve::getById($id))) {
     return;
 }
 
-// Liste
-$filter = (string) ($_GET['filter'] ?? 'affected');
-$cveFilter = strtoupper(trim((string) ($_GET['q'] ?? '')));
-echo "<div class='container-fluid'><form method='get' class='d-flex gap-2 my-2'>";
-echo "<select name='filter' class='form-select w-auto'>";
-foreach (['affected' => 'CVE avec actifs concernés', 'all' => 'Toutes les CVE suivies', 'kev' => 'Exploitation connue (KEV)'] as $k => $l) {
-    echo "<option value='" . Ui::e($k) . "'" . ($filter === $k ? ' selected' : '') . '>' . Ui::e($l) . '</option>';
-}
-echo "</select><input class='form-control w-auto' name='q' placeholder='CVE-2024-…' value='" . Ui::e($cveFilter) . "'><button class='btn btn-secondary'>Filtrer</button></form>";
+// Liste : une entrée par CVE, et dedans tous les actifs concernés
+$q = strtoupper(trim((string) ($_GET['q'] ?? '')));
+$kevOnly = !empty($_GET['kev']);
+$withNotEvaluated = !empty($_GET['ne']);
+echo "<div class='container-fluid'><form method='get' class='d-flex flex-wrap gap-3 align-items-center my-2'>"
+    . "<input class='form-control w-auto' name='q' placeholder='CVE-2024-…' value='" . Ui::e($q) . "'>"
+    . "<label class='form-check'><input class='form-check-input' type='checkbox' name='kev' value='1'" . ($kevOnly ? ' checked' : '') . "> Exploitées (KEV) seulement</label>"
+    . "<label class='form-check'><input class='form-check-input' type='checkbox' name='ne' value='1'" . ($withNotEvaluated ? ' checked' : '') . "> Inclure les « non évalués »</label>"
+    . "<button class='btn btn-secondary'>Filtrer</button></form>";
 
-$counts = [];
-foreach ($DB->request(['SELECT' => ['i.plugin_vulnwatch_cves_id AS cid', 'f.status', 'COUNT' => 'i.id AS n'], 'FROM' => 'glpi_plugin_vulnwatch_findings_items AS i',
-    'INNER JOIN' => ['glpi_plugin_vulnwatch_findings AS f' => ['ON' => ['i' => 'plugin_vulnwatch_findings_id', 'f' => 'id']]],
-    'WHERE' => ['i.state' => 'active', Ui::entityCriteria('i')], 'GROUPBY' => ['i.plugin_vulnwatch_cves_id', 'f.status']]) as $r) {
-    $counts[(int) $r['cid']][$r['status']] = (int) $r['n'];
+$where = ['i.state' => ['active', 'unverified'], 'f.status' => $withNotEvaluated ? ['established', 'to_check', 'not_evaluated'] : ['established', 'to_check']];
+if ($kevOnly) {
+    $where['c.is_kev'] = 1;
 }
-$bulletins = [];
-foreach ($DB->request(['SELECT' => ['cb.plugin_vulnwatch_cves_id AS cid', 'COUNT' => 'cb.id AS n'], 'FROM' => 'glpi_plugin_vulnwatch_cves_bulletins AS cb',
-    'INNER JOIN' => ['glpi_plugin_vulnwatch_bulletins AS b' => ['ON' => ['cb' => 'plugin_vulnwatch_bulletins_id', 'b' => 'id']],
+if ($q !== '') {
+    $where['c.cve_id'] = ['LIKE', '%' . $q . '%'];
+}
+CveView::render(Report::items($where, 20000), $canTicket, 1);
+
+// CVE suivies (citées par vos flux) sans actif concerné : utile pour la veille
+$affected = [];
+foreach ($DB->request(['SELECT' => ['plugin_vulnwatch_cves_id'], 'DISTINCT' => true, 'FROM' => 'glpi_plugin_vulnwatch_findings_items AS i',
+    'WHERE' => ['i.state' => ['active', 'unverified'], Ui::entityCriteria('i')]]) as $r) {
+    $affected[(int) $r['plugin_vulnwatch_cves_id']] = true;
+}
+$others = [];
+foreach ($DB->request(['SELECT' => ['c.id', 'c.cve_id', 'c.cvss_score', 'c.severity', 'c.is_kev', 'c.nvd_status'], 'DISTINCT' => true, 'FROM' => 'glpi_plugin_vulnwatch_cves AS c',
+    'INNER JOIN' => ['glpi_plugin_vulnwatch_cves_bulletins AS cb' => ['ON' => ['cb' => 'plugin_vulnwatch_cves_id', 'c' => 'id']],
+        'glpi_plugin_vulnwatch_bulletins AS b' => ['ON' => ['cb' => 'plugin_vulnwatch_bulletins_id', 'b' => 'id']],
         'glpi_plugin_vulnwatch_feeds AS fe' => ['ON' => ['b' => 'plugin_vulnwatch_feeds_id', 'fe' => 'id']]],
-    'WHERE' => [$feedScope], 'GROUPBY' => 'cb.plugin_vulnwatch_cves_id']) as $r) {
-    $bulletins[(int) $r['cid']] = (int) $r['n'];
-}
-$where = [];
-if ($filter === 'kev') {
-    $where['is_kev'] = 1;
-}
-if ($cveFilter !== '') {
-    $where['cve_id'] = ['LIKE', '%' . $cveFilter . '%'];
-}
-echo "<table class='table table-sm table-hover'><thead><tr><th>CVE</th><th>CVSS</th><th>KEV</th><th>Établies</th><th>À vérifier</th><th>Non évaluées</th><th>Bulletins</th><th>NVD</th></tr></thead><tbody>";
-$shown = 0;
-foreach ($DB->request(['FROM' => 'glpi_plugin_vulnwatch_cves', 'WHERE' => $where, 'ORDER' => ['is_kev DESC', 'cvss_score DESC'], 'LIMIT' => 2000]) as $c) {
-    $n = $counts[(int) $c['id']] ?? [];
-    if ($filter === 'affected' && array_sum($n) === 0) {
-        continue;
+    'WHERE' => [$feedScope], 'ORDER' => ['c.cvss_score DESC'], 'LIMIT' => 500]) as $c) {
+    if (!isset($affected[(int) $c['id']])) {
+        $others[] = $c;
     }
-    if ($filter !== 'kev' && $filter !== 'affected' && array_sum($n) === 0 && !isset($bulletins[(int) $c['id']]) && $c['origin'] === 'kev') {
-        continue; // CVE KEV globales sans lien avec le périmètre
-    }
-    $shown++;
-    echo '<tr><td>' . Ui::cveLink($c['cve_id'], (int) $c['id']) . '</td><td>' . Ui::e($c['cvss_score'] ?? '—') . ' ' . Ui::e(Cve::severityLabel($c['severity'])) . '</td><td>' . ($c['is_kev'] ? Ui::badge('KEV', 'bg-dark') : '') . '</td>'
-        . '<td>' . ($n['established'] ?? 0) . '</td><td>' . ($n['to_check'] ?? 0) . '</td><td>' . ($n['not_evaluated'] ?? 0) . '</td><td>' . ($bulletins[(int) $c['id']] ?? 0) . '</td><td>' . Ui::e($c['nvd_status']) . '</td></tr>';
 }
-if ($shown === 0) {
-    echo "<tr><td colspan='8' class='text-muted'>" . __('Aucune CVE ne correspond. Une absence de résultat ne prouve pas l\'absence de vulnérabilité : voir la couverture sur le tableau de bord.', 'vulnwatch') . '</td></tr>';
+echo "<details class='mt-4'><summary>" . Ui::e(sprintf(__('%d CVE citées par vos flux sans actif concerné dans votre périmètre', 'vulnwatch'), count($others))) . "</summary><table class='table table-sm'><tbody>";
+foreach ($others as $c) {
+    echo '<tr><td>' . Ui::cveLink($c['cve_id'], (int) $c['id']) . '</td><td>' . Ui::e($c['cvss_score'] ?? '—') . ' ' . Ui::e(Cve::severityLabel($c['severity'])) . '</td><td>' . ($c['is_kev'] ? Ui::badge('KEV', 'bg-dark') : '') . '</td><td class="small text-muted">NVD : ' . Ui::e($c['nvd_status']) . '</td></tr>';
 }
-echo '</tbody></table></div>';
+echo '</tbody></table></details></div>';
 Html::footer();

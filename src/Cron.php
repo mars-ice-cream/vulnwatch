@@ -12,8 +12,8 @@ use GlpiPlugin\Vulnwatch\Source\SourceConnectorInterface;
 /**
  * Actions automatiques natives GLPI, séparées par étape :
  *  - vulnwatchCollect : flux, NVD, KEV (chaque connecteur isolé : l'échec de l'un n'arrête pas les autres) ;
- *  - vulnwatchAnalyze : rapprochement local et suivi des corrections ;
- *  - vulnwatchTickets : tickets de campagne automatiques (n'agit que pour les entités qui l'ont activé).
+ *  - vulnwatchAnalyze : rapprochement local et suivi des corrections.
+ * Les tickets ne sont jamais créés automatiquement : uniquement à la demande, depuis une alerte.
  */
 final class Cron extends \CommonGLPI
 {
@@ -23,8 +23,6 @@ final class Cron extends \CommonGLPI
             'comment' => 'VulnWatch : collecte des sources (flux, NVD, KEV)']);
         CronTask::register(self::class, 'vulnwatchAnalyze', HOUR_TIMESTAMP, ['state' => CronTask::STATE_WAITING, 'mode' => CronTask::MODE_EXTERNAL,
             'comment' => 'VulnWatch : rapprochement inventaire et suivi des corrections']);
-        CronTask::register(self::class, 'vulnwatchTickets', DAY_TIMESTAMP, ['state' => CronTask::STATE_WAITING, 'mode' => CronTask::MODE_EXTERNAL,
-            'comment' => 'VulnWatch : tickets automatiques (désactivés par défaut dans chaque entité)']);
     }
 
     public static function cronInfo(string $name): array
@@ -32,7 +30,6 @@ final class Cron extends \CommonGLPI
         return match ($name) {
             'vulnwatchCollect' => ['description' => __('Collecte des sources de vulnérabilités', 'vulnwatch'), 'parameter' => __('Budget par connecteur', 'vulnwatch')],
             'vulnwatchAnalyze' => ['description' => __('Rapprochement inventaire / vulnérabilités', 'vulnwatch')],
-            'vulnwatchTickets' => ['description' => __('Tickets de campagne automatiques', 'vulnwatch')],
             default => [],
         };
     }
@@ -68,13 +65,5 @@ final class Cron extends \CommonGLPI
         $task?->log(json_encode($stats));
         $task?->addVolume($stats['evaluations']);
         return 1;
-    }
-
-    public static function cronVulnwatchTickets(?CronTask $task = null): int
-    {
-        $report = Campaign::runAutomatic();
-        $task?->log(json_encode($report));
-        $task?->addVolume($report['tickets_created'] + $report['tickets_updated']);
-        return ($report['tickets_created'] + $report['tickets_updated']) > 0 ? 1 : 0;
     }
 }

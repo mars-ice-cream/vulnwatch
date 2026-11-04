@@ -4,7 +4,7 @@ VulnWatch croise l'inventaire déjà remonté par GLPI Agent avec des sources de
 
 Il répond à quatre questions, dans les fiches GLPI :
 
-1. **Qui est concerné ?** Vues par CVE, par logiciel et par entité, plus un onglet *Vulnérabilités* sur les ordinateurs, téléphones, matériels réseau et imprimantes.
+1. **Qui est concerné ?** La vue principale est organisée **par CVE** : une entrée par CVE, triée par priorité, et dedans tous les actifs concernés (client, dernier inventaire, version, statut, raison). Il existe aussi une vue par logiciel et un onglet *Vulnérabilités* sur chaque ordinateur, téléphone, matériel réseau ou imprimante.
 2. **Pourquoi ?** Chaque résultat affiche la source, le produit CPE retenu, la version relevée, la règle appliquée (bornes incluses ou exclues), la date d'inventaire, le niveau de confiance et la liste des raisons.
 3. **Quoi traiter d'abord ?** La priorité combine gravité CVSS, exploitation connue (KEV), criticité et exposition de l'actif ; ses critères sont visibles. La confiance (fiabilité de la détection) est affichée séparément.
 4. **La correction est-elle appliquée ?** Le statut *Corrigé* n'est posé que si un inventaire plus récent et non ancien montre que la condition n'est plus remplie (logiciel mis à jour ou retiré). Si la version vulnérable revient, une régression est signalée.
@@ -35,12 +35,12 @@ php bin/console plugin:install vulnwatch -u <admin>
 php bin/console plugin:activate vulnwatch
 ```
 
-L'installation crée 13 tables `glpi_plugin_vulnwatch_*`, deux droits de profil et trois actions automatiques. La désinstallation supprime les tables, les droits et la configuration du plugin.
+L'installation crée 12 tables `glpi_plugin_vulnwatch_*`, deux droits de profil et deux actions automatiques. La désinstallation supprime les tables, les droits et la configuration du plugin.
 
 ### Droits (Administration > Profils > onglet Vulnérabilités)
 
 - `plugin_vulnwatch` : **Lire** (consulter), **Modifier** (valider ou rejeter les associations, traiter la veille, criticité/exposition d'un actif), **Créer** (tickets de campagne ; le droit natif de création de ticket est aussi exigé).
-- `plugin_vulnwatch_config` : **Lire**, **Modifier** (flux, versions cibles, paramètres, automatisation). Ajouter un flux demande *Modifier*.
+- `plugin_vulnwatch_config` : **Lire**, **Modifier** (flux, versions cibles, paramètres). Ajouter un flux demande *Modifier*.
 
 À l'installation, les profils qui ont le droit de modifier la configuration GLPI reçoivent tous les droits du plugin.
 
@@ -50,9 +50,10 @@ L'installation crée 13 tables `glpi_plugin_vulnwatch_*`, deux droits de profil 
 |---|---|---|
 | `vulnwatchCollect` | 1 h | flux, NVD, KEV : chaque connecteur est isolé, l'échec de l'un n'arrête pas les autres |
 | `vulnwatchAnalyze` | 1 h | rapprochement local et suivi des corrections |
-| `vulnwatchTickets` | 1 j | tickets automatiques, seulement dans les entités qui les ont activés |
 
-Commande manuelle : `php bin/console plugins:vulnwatch:run --step=collect|analyze|tickets|all`.
+Commande manuelle : `php bin/console plugins:vulnwatch:run --step=collect|analyze|all`.
+
+Aucune action automatique ne crée de ticket : les tickets ne naissent que d'un clic sur une alerte.
 
 ## Compatibilité GLPI 11 / 12
 
@@ -76,7 +77,6 @@ Pour vérifier un autre correctif de GLPI : `php tests/load_classes.php /chemin/
 - **CISA KEV** : met à jour les CVE déjà suivies. L'option « suivre toutes » importe tout le catalogue.
 - **Inventaire ancien** : 30 jours par défaut.
 - **Sécurité HTTP** : délai et taille maximum, ports autorisés, liste des sources internes autorisées, proxy.
-- **Tickets automatiques** : désactivés par défaut, à activer entité par entité, avec un seuil de confiance (≥ 70) et un seuil de priorité.
 - **Journal des décisions** : associations, veille, tickets, flux, cibles, contextes d'actifs.
 
 ### Flux RSS / Atom (Outils > Vulnérabilités > Flux de veille)
@@ -105,13 +105,13 @@ Les noms inventoriés sont normalisés (version, architecture, langue et suffixe
 
 Valider ou rejeter une association est une décision tracée, réutilisée par toutes les analyses suivantes. On peut aussi saisir une association à la main.
 
-## Tickets de campagne
+## Tickets de campagne (manuels uniquement)
 
-Depuis l'onglet d'un actif, la fiche d'une CVE ou le tableau de bord, on coche des alertes puis on choisit **Créer ou compléter le ticket de campagne**.
+Dans la vue par CVE (ou sur la fiche d'une CVE, ou dans l'onglet d'un actif), on coche des actifs — une case permet de cocher tous les actifs d'une CVE — puis on clique **Créer ou compléter le ticket de campagne**. Aucun ticket n'est jamais créé automatiquement, pour ne pas polluer la file de tickets.
 
-- Il y a un ticket par **entité × produit × version cible**, pas un par machine.
+- Il y a un ticket par **client (entité) × logiciel × version cible**, pas un par machine ni par CVE.
 - Les actifs sont liés au ticket (lien natif), avec les CVE, la version relevée, la version corrigée et la raison de l'alerte.
-- Si un ticket ouvert existe déjà, le plugin ajoute un suivi qui ne liste que les nouveaux éléments. Les alertes déjà rattachées ne créent jamais de doublon, même après une nouvelle synchronisation.
+- Si un ticket ouvert existe déjà, le plugin ajoute un suivi qui ne liste que les nouveaux éléments, et le titre est mis à jour avec le nombre réel d'actifs. Les alertes déjà rattachées ne créent jamais de doublon.
 - Un ticket résolu ou clos ouvre une nouvelle campagne au besoin.
 - La correction est vérifiée au prochain inventaire de chaque actif.
 
@@ -154,7 +154,7 @@ php -S 127.0.0.2:8099 tests/fixture_router.php &         # serveur de jeux de te
 php tests/integration.php /chemin/glpi http://127.0.0.1:8088   # instance de TEST uniquement
 ```
 
-Résultats actuels : 77 tests unitaires et 70 tests d'intégration réussis sur GLPI 11.0.9 comme sur GLPI 12.0.1.
+Résultats actuels : 77 tests unitaires et 71 tests d'intégration réussis sur GLPI 11.0.9 comme sur GLPI 12.0.1.
 
 Le test d'intégration vide les tables du plugin et crée des entités et actifs « VW » : **ne jamais le lancer en production**.
 
