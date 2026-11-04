@@ -1,0 +1,31 @@
+{
+ "title": "CISA Catalog of Known Exploited Vulnerabilities (fixture)",
+ "catalogVersion": "2026.11.03",
+ "count": 3,
+ "vulnerabilities": [
+  {
+   "cveID": "CVE-2024-9680",
+   "vendorProject": "Mozilla",
+   "product": "Firefox",
+   "dateAdded": "2024-10-15",
+   "dueDate": "2024-11-05",
+   "knownRansomwareCampaignUse": "Unknown"
+  },
+  {
+   "cveID": "CVE-2024-4577",
+   "vendorProject": "PHP Group",
+   "product": "PHP",
+   "dateAdded": "2024-06-12",
+   "dueDate": "2024-07-03",
+   "knownRansomwareCampaignUse": "Known"
+  },
+  {
+   "cveID": "CVE-2021-44228",
+   "vendorProject": "Apache",
+   "product": "Log4j2",
+   "dateAdded": "2021-12-10",
+   "dueDate": "2021-12-24",
+   "knownRansomwareCampaignUse": "Known"
+  }
+ ]
+}

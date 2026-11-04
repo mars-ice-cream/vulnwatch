@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+<title>Bulletins éditeur (jeu de test)</title><id>urn:test:vendor</id><updated>2024-10-10T00:00:00Z</updated>
+<entry><title>MFSA 2024-51 : Firefox 131.0.2</title><id>urn:mfsa:2024-51</id><link rel="alternate" href="https://www.mozilla.org/security/advisories/mfsa2024-51/"/>
+<updated>2024-10-09T00:00:00Z</updated><summary>Correctif pour CVE-2024-9680 (exploitée).</summary></entry>
+<entry><title>Chrome : mise à jour de sécurité</title><id>urn:chrome:116</id><link href="https://chromereleases.googleblog.com/2023/09/"/>
+<updated>2023-09-11T00:00:00Z</updated><content type="html">&lt;p&gt;Correctif CVE-2023-4863&lt;/p&gt;</content></entry>
+</feed>

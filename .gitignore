@@ -1,0 +1,5 @@
+tests/integration-results.json
+*.tar.bz2
+vendor/
+.idea/
+.vscode/
