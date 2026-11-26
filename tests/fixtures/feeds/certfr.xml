@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<channel>
+<title>CERT-FR (jeu de test)</title><link>https://www.cert.ssi.gouv.fr/</link><description>Avis de sécurité</description>
+<item><title>Multiples vulnérabilités dans Mozilla Firefox</title><link>https://www.cert.ssi.gouv.fr/avis/CERTFR-2024-AVI-0850/?utm_source=rss</link><guid>CERTFR-2024-AVI-0850</guid>
+<pubDate>Wed, 09 Oct 2024 10:00:00 +0200</pubDate><description><![CDATA[<p>Une vulnérabilité a été découverte dans Mozilla Firefox. Elle permet à un attaquant de provoquer une exécution de code arbitraire. Référence : <a href="https://www.cve.org/CVERecord?id=CVE-2024-9680">CVE-2024-9680</a></p><script>alert(1)</script>]]></description></item>
+<item><title>Vulnérabilité dans 7-Zip</title><link>https://www.cert.ssi.gouv.fr/avis/CERTFR-2024-AVI-1001/</link><guid>CERTFR-2024-AVI-1001</guid>
+<pubDate>Mon, 25 Nov 2024 10:00:00 +0100</pubDate><description>7-Zip : dépassement d'entier (cve-2024-11477).</description></item>
+<item><title>Multiples vulnérabilités dans les produits Cisco (détails à paraître)</title><link>https://www.cert.ssi.gouv.fr/avis/CERTFR-2024-AVI-1002/</link><guid>CERTFR-2024-AVI-1002</guid>
+<pubDate>Tue, 26 Nov 2024 10:00:00 +0100</pubDate><description>De multiples vulnérabilités ont été découvertes. Les identifiants seront publiés ultérieurement.</description></item>
+<item><title>Vulnérabilité dans 7-Zip</title><link>https://www.cert.ssi.gouv.fr/avis/CERTFR-2024-AVI-1001/</link><guid>CERTFR-2024-AVI-1001</guid>
+<pubDate>Mon, 25 Nov 2024 10:00:00 +0100</pubDate><description>Doublon dans la même réponse (cve-2024-11477).</description></item>
+<item><title>Vulnérabilité dans PHP (Windows)</title><link>https://www.cert.ssi.gouv.fr/avis/CERTFR-2024-AVI-0480/</link><guid>CERTFR-2024-AVI-0480</guid>
+<pubDate>Fri, 07 Jun 2024 10:00:00 +0200</pubDate><description>CVE-2024-4577 exploitée activement. Également CVE-2024-6387 pour OpenSSH.</description></item>
+<item><title>Notepad++ : débordement de tas</title><link>javascript:alert(1)</link><guid>NPP-2023</guid><pubDate>Fri, 25 Aug 2023 10:00:00 +0200</pubDate><description>CVE-2023-40031</description></item>
+</channel></rss>
